@@ -1,3 +1,4 @@
+'''
 from flask import Flask, request, redirect, url_for, session, render_template_string, make_response
 import os
 import time
@@ -315,3 +316,148 @@ def admin_purge():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+'''
+
+from flask import Flask, request, redirect, url_for, session, render_template_string, make_response
+
+app = Flask(__name__)
+app.secret_key = "CAMBIA_ESTA_CLAVE_POR_UNA_LARGA_Y_ALEATORIA"
+
+# Endurecimiento básico de la cookie de sesión
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = True   # En Render con HTTPS debe ir en True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+USUARIO_PRUEBA = "demo"
+CLAVE_PRUEBA = "demo123"
+
+HTML_HOME = """
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Inicio</title>
+</head>
+<body>
+    <h1>App web simple en Flask</h1>
+
+    {% if "usuario" in session %}
+        <p>Bienvenido, {{ session["usuario"] }}</p>
+        <p><a href="{{ url_for('privado') }}">Ir a zona privada</a></p>
+        <p><a href="{{ url_for('logout') }}">Cerrar sesión</a></p>
+    {% else %}
+        <p>No has iniciado sesión.</p>
+        <p><a href="{{ url_for('login') }}">Ir a login</a></p>
+    {% endif %}
+</body>
+</html>
+"""
+
+HTML_LOGIN = """
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Login</title>
+</head>
+<body>
+    <h1>Iniciar sesión</h1>
+
+    {% if error %}
+        <p style="color:red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="post">
+        <label>Usuario:</label>
+        <input type="text" name="usuario" required>
+        <br><br>
+        <label>Clave:</label>
+        <input type="password" name="clave" required>
+        <br><br>
+        <button type="submit">Entrar</button>
+    </form>
+
+    <p><a href="{{ url_for('home') }}">Volver al inicio</a></p>
+</body>
+</html>
+"""
+
+HTML_PRIVADO = """
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Zona privada</title>
+</head>
+<body>
+    <h1>Zona privada</h1>
+    <p>Hola, {{ usuario }}.</p>
+    <p>Este contenido depende de la sesión y no debe almacenarse en caché.</p>
+    <p><a href="{{ url_for('home') }}">Inicio</a></p>
+    <p><a href="{{ url_for('logout') }}">Cerrar sesión</a></p>
+</body>
+</html>
+"""
+
+def add_no_cache_headers(resp):
+    """
+    Evita que navegador o proxies almacenen contenido sensible.
+    """
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+@app.after_request
+def apply_security_headers(response):
+    """
+    Encabezados de seguridad generales.
+    """
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+@app.route("/")
+def home():
+    resp = make_response(render_template_string(HTML_HOME))
+    return add_no_cache_headers(resp)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+
+    if request.method == "POST":
+        usuario = request.form.get("usuario", "").strip()
+        clave = request.form.get("clave", "")
+
+        if usuario == USUARIO_PRUEBA and clave == CLAVE_PRUEBA:
+            session.clear()
+            session["usuario"] = usuario
+            resp = make_response(redirect(url_for("privado")))
+            return add_no_cache_headers(resp)
+        else:
+            error = "Credenciales inválidas"
+
+    resp = make_response(render_template_string(HTML_LOGIN, error=error))
+    return add_no_cache_headers(resp)
+
+@app.route("/privado")
+def privado():
+    if "usuario" not in session:
+        resp = make_response(redirect(url_for("login")))
+        return add_no_cache_headers(resp)
+
+    resp = make_response(
+        render_template_string(HTML_PRIVADO, usuario=session["usuario"])
+    )
+    return add_no_cache_headers(resp)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    resp = make_response(redirect(url_for("login")))
+    return add_no_cache_headers(resp)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=False)
