@@ -1,4 +1,5 @@
-'''
+
+# codigo vulnerable
 from flask import Flask, request, redirect, url_for, session, render_template_string, make_response
 import os
 import time
@@ -316,8 +317,11 @@ def admin_purge():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
-'''
 
+
+
+'''
+#codigo no vulnerable
 from flask import Flask, request, redirect, url_for, session, render_template_string, make_response
 
 app = Flask(__name__)
@@ -461,3 +465,4 @@ def logout():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
+'''
